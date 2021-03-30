@@ -1,0 +1,341 @@
+# importing all the required modules
+import PyPDF2 
+import re 
+import csv 
+import os 
+
+mydict = {"filelocvar":[],"pubdatevar":[], "conamevar":[], "filenumvar":[], 
+          "extensionvar":[], "newvar":[], "approvevar":[], "extensionvar":[], 
+          "newvar":[], "approvevar":[], "denyvar":[], "staffvar":[], "rolevar":[], 
+          "formvar":[], "staffvar":[], "rolevar":[], "amendvar":[], "amenddatevar":[], 
+          "extendatevar":[], "expirydatesvar":[], "exhibitsvar":[]}
+
+for i in range(3, 13241):
+
+    #missing
+    if i == 1988: 
+        continue 
+    if i == 10636:
+        continue
+
+    try: 
+        # creating a pdf reader object
+        with open("C:/Users/Will McShane/Documents/ctorders/file"+str(i)+".pdf", 'rb') as file:    
+            read_pdf = PyPDF2.PdfFileReader(file, strict=False)
+            number_of_pages = read_pdf.getNumPages()
+            
+            if number_of_pages==1:
+                pageObj =read_pdf.getPage(0)
+                string = pageObj.extractText()
+            
+            if number_of_pages==2:
+                pageObj1 =read_pdf.getPage(0)
+                pageObj2 =read_pdf.getPage(1)
+                string = pageObj1.extractText()+pageObj2.extractText()
+            
+            
+
+            fileloc = str(i)
+            mydict["filelocvar"].append(fileloc)
+
+            # is this an amendment?
+            mycompile = re.compile("a\s*s\s*amended|as\s*modified", re.DOTALL)
+            amend= re.search(mycompile, string)                        
+            amendment = amend != None
+            mydict["amendvar"].append(amendment)
+
+            if amendment == False:
+                mydict["amendvar"].append("")
+                mydict["amenddatevar"].append("")
+            #if so, when was the original filed?
+
+            if amendment != False:
+                mycompile = re.compile("(f\s*i\s*l\s*e\s*d\s*o\s*n|a\s*m\s*e\s*n\s*d\s*e\s*d\s*o\s*n|to the Azur)(.*?)(B\s*a\s*s\s*e\s*d|a\s*s\s*a\s*m\s*e\s*n\s*d\s*e\s*d)", re.DOTALL)
+                amenddate = re.findall(mycompile, string)
+                if len(amenddate)==0:
+                    mycompile = re.compile("(filed\s*)(.*?)(as\s*amended)")               
+                    amenddate = re.findall(mycompile, string)
+                amenddate=amenddate[0][1]
+                amenddate=amenddate.replace("\n","")
+                amenddate=amenddate.replace(",","")
+                amenddate=amenddate.strip()
+                
+                
+                    
+                
+                mycompile = re.compile("and", re.DOTALL)
+                andstr = re.search(mycompile, amenddate)
+                if len(amenddate) > 20 and andstr == None:
+                    mycompile = re.compile("(filed\s*on|K\s*on|application\s*on|Q\s*on|filed\s*)(.*?)(\.)", re.DOTALL)
+                    amenddate = re.findall(mycompile, amenddate)[0][1]
+                    amenddate=amenddate.replace(".","")
+                    amenddate=amenddate.strip()
+                amenddate=amenddate.replace(".","")
+                mydict["amenddatevar"].append(amenddate)
+            
+            #what kind of form
+            mycompile = re.compile("(to\s*a)(.*?)(filed|on)", re.DOTALL)
+            form = re.findall(mycompile, string)
+            if len(form) == 0:
+                mycompile = re.compile("(to\s*)(.*?)(filed|on)", re.DOTALL)
+                form = re.findall(mycompile, string)
+            form =form[0][1]
+            form=form.replace("\n","")
+            form=form.replace("no amended","")
+            form=form.replace("registrati","")
+            form=form.strip()
+            
+            if len(form) == 0:
+                mydict["formvar"].append("")
+            mydict["formvar"].append(form)
+
+            #staff member
+            mycompile = re.compile("a\s*u\s*t\s*h\s*o\s*r\s*i\s*t\s*y(.*)", re.DOTALL)
+            staff =re.findall(mycompile, string)
+            if len(staff)==0:
+                mycompile = re.compile("delegated\s*order\.(.*)", re.DOTALL)
+                staff = re.findall(mycompile, string)
+            if len(staff)==0:
+                mycompile = re.compile("For\s*the\s*Commission:(.*)", re.DOTALL)
+                staff = re.findall(mycompile, string)
+            staff=staff[0]
+            staff=staff.replace("\n","")
+            staff=staff.replace(":","")
+            staff=staff.replace("     ","")
+            staff=staff.replace(",","")
+            staff=staff.strip()
+
+
+            # staff role
+            ##secretary
+            mycompile= re.compile("Secretary", re.DOTALL)
+            secr= re.search(mycompile, staff)                        
+
+            secretary = secr != None
+
+            if secr != None:
+                staff=staff.replace("Secretary","")
+                role="Secretary"
+            ####special counsel and information officer
+
+            mycompile= re.compile("Special\s+Counsel\s+and\s+Information\s+Officer", re.DOTALL)
+            speccounsinfo= re.search(mycompile,staff)
+            if speccounsinfo != None:
+                staff=staff.replace("Special Counsel and Information Officer","")
+                role="Special Counsel and Information Officer"
+
+            ##special counsel
+            mycompile= re.compile("Special\s*Counsel", re.DOTALL)
+            speccouns= re.search(mycompile,staff)
+            if speccouns != None:
+                staff=staff.replace("Special Counsel","")
+                role="Special Counsel"
+
+           #assistant director
+            mycompile= re.compile("A\s*s\s*s\s*i\s*s\s*t\s*a\s*n\s*t\s*D\s*i\s*r\s*e\s*c\s*t\s*o\s*r", re.DOTALL)
+            asdir= re.search(mycompile,staff)
+            if asdir != None:
+                staff=staff.replace("Assistant Director","")
+                role="Assistant Director"
+
+
+            #chief office of disclosure support
+            mycompile= re.compile("Chief\s*Office\s*of\s*Disclosure\s*Support", re.DOTALL)
+            chiefoffdisc= re.search(mycompile,staff)
+            if chiefoffdisc != None:
+                staff=staff.replace("Chief, Office of Disclosure Support","")
+                role="Chief, Office of Disclosure Support"
+
+
+            #office of disclosure support
+            mycompile= re.compile("Office\s*of\s*Disclosure\s*Support", re.DOTALL)
+            offdisc= re.search(mycompile,staff)
+            if offdisc != None:
+                staff=staff.replace("Office of Disclosure Support","")
+                role="Office of Disclosure Support"
+
+            #Chief, Office of Mergers & Acquisitions
+            mycompile= re.compile("Chief\s*,\s*Office\s*pf\s*Mergers\s*&\s*Acquisitions", re.DOTALL)
+            chiefma= re.search(mycompile,staff)
+            if chiefma != None:
+                staff=staff.replace("Chief, Office of Mergers & Acquisitions","")
+                role="Chief, Office of Mergers & Acquisitions"
+
+
+
+            #branch chief abd legal
+            mycompile= re.compile("Branch\s*Œ\s*Chief", re.DOTALL)
+            branchchieflegal= re.search(mycompile,staff)
+            if branchchieflegal != None:
+                staff=staff.replace("Branch Chief Œ Legal","")
+                role="Branch Chief & Legal"
+
+
+            #branch chief
+            mycompile= re.compile("Branch\s*Chief", re.DOTALL)
+            branchchief= re.search(mycompile,staff)
+            if branchchief != None:
+                staff=staff.replace("Branch Chief","")
+                role="Branch Chief" 
+
+            #chief
+            mycompile= re.compile("Chief", re.DOTALL)
+            chief= re.search(mycompile,staff)
+            if chief != None:
+                staff=staff.replace("Chief","")
+                role="Chief"
+            #fill in missing as commas
+            if len(role) == 0:
+                mydict["rolevar"].append("")
+            if len(staff) == 0:
+                mydict["staffvar"].append("")
+
+
+            #add role and staff variable
+
+            mydict["rolevar"].append(role)
+            mydict["staffvar"].append(staff)
+
+
+             #extract publication date
+            mycompile = re.compile("ION(.*)ORD", re.DOTALL)
+            pubdates=re.findall(mycompile, string)
+            pubdate= pubdates[0]
+            pubdate=pubdate.replace("\n","")
+            pubdate=pubdate.replace("-","")
+            pubdate=pubdate.strip()
+
+            if len(pubdate) == 0: 
+                mydict["pubdatevar"].append("")
+
+
+            mydict["pubdatevar"].append(pubdate)
+
+            #extract company name
+            mycompile = re.compile("(19\d\d|19\d+\s\d)(.*)F\s*i\s*l\s*e", re.DOTALL)
+            coname =re.findall(mycompile, string)[0][1]
+            coname=coname.replace("\n","")
+            coname = coname.strip()
+
+            if len(coname) == 0:
+                mydict["conamevar"].append("")
+            mydict["conamevar"].append(coname)
+
+            #extract file number
+
+            mycompile = re.compile("(F\s*i\s*l\s*e\s*N\s*o\.|F\s*i\s*l\s*e\s*N\s*o)(.*)(\_|---)", re.DOTALL)
+            filenum =re.findall(mycompile, string)[0][1]
+            filenum =filenum.replace("_", "")
+            filenum =filenum.replace("--", "")
+            filenum =filenum.replace("\n", "")
+            ilenum =filenum.replace("  ", "")
+            filenum =filenum.strip()
+
+            if len(filenum) == 0:
+                mydict["filenumvar"].append("")
+              #  print("found no filenum in file"+str(i))
+            mydict["filenumvar"].append(filenum)
+   # was this request denied?
+            mycompile = re.compile("d\s*e\s*n\s*i\s*e\s*d", re.DOTALL)
+            denied= re.search(mycompile, string)                        
+            deny = denied != None
+            mydict["denyvar"].append(deny)
+
+
+            #is this an extension request? true or false (extension)
+            mycompile = re.compile("r\s*e\s*q\s*u\s*e\s*s\s*t\s*i\s*n\s*g\s+a\s*n\s+e\s*x\s*t\s*e\s*n\s*s\s*i\s*o\s*n", re.DOTALL)
+            exten= re.search(mycompile, string)                        
+            extension = exten != None
+            mydict["extensionvar"].append(extension)
+
+            if extension == False:
+                 mydict["extendatevar"].append("")
+
+
+            if extension == True:
+                mycompile = re.compile("(f\s*i\s*l\s*e\s*d\s*o\s*n|filed)(.*?)(Based|,\s*as)", re.DOTALL)
+                extendate = re.findall(mycompile, string)[0][1]
+                extendate=extendate.replace("\n","")
+                extendate=extendate.replace(".","")
+                extendate=extendate.strip()
+                mydict["extendatevar"].append(extendate)
+  #  is this an original request? true or false (new)
+            mycompile = re.compile("r\s*e\s*q\s*u\s*e\s*s\s*t\s*i\s*n\s*g\s+c\s*o\s*n\s*f\s*i\s*d\s*e\s*n\s*t\s*i\s*a\s*l\s+t\s*r\s*e\s*a\s*t\s*m\s*e\s*n\s*t", re.DOTALL)
+            original= re.search(mycompile, string)                        
+            new = original != None
+            mydict["newvar"].append(new)
+
+            #was this request approved?  NEED TO CREATE FLAG IN LOOP FOR NONE / UNAPPROVED 
+            mycompile= re.compile("n\s*o\s*t\s+t\s*o\s+p\s*u\s*b\s*l\s*i\s*c\s*l\s*y\s+d\s*i\s*s\s*c\s*l\s*o\s*s\s*e", re.DOTALL)
+            approve = re.search(mycompile, string)
+            approved = approve != None
+            mydict["approvevar"].append(approved)
+
+            #what exhibits?
+            mycompile = re.compile("\sExhibit\s(\d\d.\d*?|\d.*?)\s", re.DOTALL)
+            exhibits=re.findall(mycompile, string)
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile("\s\s\sExhibit(.*?)until", re.DOTALL)
+#                 exhibits=re.findall(mycompile, string)
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile("\nExhibit(.*?)through|until", re.DOTALL)
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile("\sExhibit\s(\d\d.\d\d)\s")
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile("\sExhibit\s(\d\d.\d)\s")
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile("\sExhibit\s(\d.\d)\s")
+
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile(":\s*Exhibit(.*?)until", re.DOTALL)
+#                 exhibits=re.findall(mycompile, string)
+ 
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile(":\s*Exhibit(.*?)through", re.DOTALL)
+#             if len(exhibits) == 0:
+#                 mycompile = re.compile(":\s*Exhibit(.*?)through", re.DOTALL)        
+            if len(exhibits) == 0:
+                mydict["exhibitsvar"].append("")
+            for x in (0, 22):
+                if len(exhibits)>(x):
+                    exhibits[x]=exhibits[x].replace("to Form 10-Q","")
+                    exhibits[x]=exhibits[x].replace("For the Commission, by the Division of","")
+                    exhibits[x]=exhibits[x].replace("  "," ")
+                    exhibits[x]=exhibits[x].replace("\n","")
+                    exhibits[x]=exhibits[x].replace("...","")
+                    exhibits[x]=exhibits[x].strip()
+            mydict["exhibitsvar"].append(exhibits)
+
+            #expiry dates            
+            mycompile = re.compile("through(.*?)\n", re.DOTALL)
+            expirydates=re.findall(mycompile, string)
+            if len(expirydates) == 0:
+                mycompile = re.compile("until(.*?)\n", re.DOTALL)
+                expirydates=re.findall(mycompile, string)
+            for x in (0, 12):
+                if len(expirydates)>(x):
+                    expirydates[x]=expirydates[x].replace("to Form 10-Q","")
+                    expirydates[x]=expirydates[x].replace("For the Commission, by the Division of","")
+                    expirydates[x]=expirydates[x].replace("\n","")
+                    expirydates[x]=expirydates[x].replace("  "," ")
+                    expirydates[x]=expirydates[x].strip()
+
+                mydict["expirydatesvar"].append(expirydates)
+            if len(expirydates) == 0:
+                mydict["expirydatesvar"].append("")
+
+
+
+
+
+    except FileNotFoundError as e:
+            print("file"+str(i)+" empty")
+            break
+
+    except IndexError as e:
+            print("file number of"+str(i)+" returns IndexError")
+            continue
+with open("C:/Users/Will McShane/Documents/ctorder_df1.csv", "w+", newline='', encoding='utf-8') as outfile: 
+    writer = csv.writer(outfile, delimiter = "\t") 
+    writer.writerow(mydict.keys()) 
+    writer.writerows(zip(*mydict.values()))
